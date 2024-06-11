@@ -1,0 +1,19 @@
+version: '3'
+
+tasks:
+  run-structured-response:
+    desc: Run ollama-structured-output.py
+    cmds:
+      - PYTHONPATH={{.TASKFILE_DIR}} {{.TASKFILE_DIR}}/venv/bin/python structured_responses/ollama-structured-output.py
+    
+  run-function-call-response:
+    desc: Run ollama-function-call.py
+    cmds:
+      - PYTHONPATH={{.TASKFILE_DIR}} {{.TASKFILE_DIR}}/venv/bin/python function_calls/ollama-function-call.py
+
+  # clear all python cache files
+  clean:
+    desc: Clear all python cache files
+    cmds:
+      - find . -name '*.pyc' -delete
+      - find . -name '__pycache__' -delete

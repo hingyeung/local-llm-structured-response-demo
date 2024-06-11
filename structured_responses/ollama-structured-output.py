@@ -8,7 +8,7 @@ from langchain.output_parsers import (
 )
 from langchain_core.runnables import RunnableParallel, RunnableLambda
 
-from utils.config import Config
+from structured_responses.config import Config
 
 
 config = Config()
