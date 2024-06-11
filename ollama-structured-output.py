@@ -22,35 +22,46 @@ class Person(BaseModel):
     age: int = Field(description="Age of the person")
 
 
-template = """You are an assistant IA and is very good at extracting deep meaning in provided context. Answer user question based on the context provided.
+plain_text_template = """You are an assistant IA and is very good at extracting deep meaning in provided context. Answer user question based on the context provided.
 Context: {context}
 {format_instructions}
 Question: {query}
 Response:"""
 
-llm = Ollama(temperature=0, model="llama3")
+# <|eot_id|> is supposed to be at the end of the text. The response was very wrong when I put the <|eot_id|> on the next line.
+# Not sure why.
+template_with_system_prompt_and_llama3_token = """
+<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+You are an assistant IA and is very good at extracting deep meaning in provided context. Answer user question based on the context provided.<|eot_id|><|start_header_id|>user<|end_header_id|>
+Context: {context}
+{format_instructions}
+Question: {query}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+Response:<|eot_id|>
+"""
 
-person_pydantic_parser = PydanticOutputParser(pydantic_object=Person)
-fix_parser = OutputFixingParser.from_llm(parser=person_pydantic_parser, llm=llm)
-retry_parser = RetryOutputParser.from_llm(parser=fix_parser, llm=llm)
+for template in [plain_text_template, template_with_system_prompt_and_llama3_token]:
+    llm = Ollama(temperature=0, model="llama3")
 
-query = "What is the name of Peter's brother? And how old is he?"
-prompt = PromptTemplate(
-    template=template,
-    partial_variables={
-        "format_instructions": person_pydantic_parser.get_format_instructions(),
-        "context": context,
-    },
-    input_variables=["query"],
-)
-print(prompt.invoke({"query": user_question}))
+    person_pydantic_parser = PydanticOutputParser(pydantic_object=Person)
+    fix_parser = OutputFixingParser.from_llm(parser=person_pydantic_parser, llm=llm)
+    retry_parser = RetryOutputParser.from_llm(parser=fix_parser, llm=llm)
 
-# use retry_parser to get acceptable answerbefore giving it to
-# pydantic parser to get the final Person object
-chain = prompt | llm
-main_chain = RunnableParallel(completion=chain, prompt_value=prompt) | RunnableLambda(
-    lambda x: retry_parser.parse_with_prompt(**x)
-)
+    prompt = PromptTemplate(
+        template=template,
+        partial_variables={
+            "format_instructions": person_pydantic_parser.get_format_instructions(),
+            "context": context,
+        },
+        input_variables=["query"],
+    )
+    print(f"\n\nPrompt >>>  {prompt.invoke({"query": user_question})}")
 
-response = main_chain.invoke({"query": user_question})
-print(response)
+    # use retry_parser to get acceptable answer before giving it to
+    # pydantic parser to get the final Person object
+    chain = prompt | llm
+    main_chain = RunnableParallel(completion=chain, prompt_value=prompt) | RunnableLambda(
+        lambda x: retry_parser.parse_with_prompt(**x)
+    )
+
+    print(f"Plain text response >>>  {chain.invoke({"query": user_question})}")
+    print(f"Structured response >>>  {main_chain.invoke({"query": user_question})}")
